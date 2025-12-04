@@ -1,7 +1,7 @@
-
 module "variable_account"{
  source= "./../../../variables"
 }
+
 resource "aws_iam_role" "aws-codepipeline-lab-pipeline-role" {
   name = "aws-codepipeline-lab-pipeline-role"
   

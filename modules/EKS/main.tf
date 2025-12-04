@@ -24,6 +24,7 @@ module "eks" {
       most_recent = true
     }
   }
+
   vpc_id                   = module.vpc.vpc_id
   subnet_ids               = module.vpc.private_subnets
   control_plane_subnet_ids = module.vpc.intra_subnets
@@ -41,5 +42,4 @@ module "eks" {
   }
 
   tags = local.tags
-
 }

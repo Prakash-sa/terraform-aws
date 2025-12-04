@@ -1,6 +1,7 @@
 module "variable_account" {
   source = "./../../variables"
 }
+
 module "eks_codebuild_role" {
   source = "../iam_roles/eks-codebuild-role"
 }
@@ -8,7 +9,6 @@ module "eks_codebuild_role" {
 locals {
   s3_name = "bucket-${module.variable_account.account_id}"
 }
-
 
 # CodeBuild Project
 resource "aws_codebuild_project" "aws-codepipeline-lab-codebuild-project" {
@@ -25,7 +25,7 @@ resource "aws_codebuild_project" "aws-codepipeline-lab-codebuild-project" {
 
   source {
     type            = "GITHUB"
-    location        = "<GITHUB_LINK>"
+    location        = "https://github.com/Prakash-sa/terraform-aws"
     git_clone_depth = 1
     buildspec       = "buildspec.yml"
   }
