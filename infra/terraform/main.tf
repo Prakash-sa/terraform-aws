@@ -15,6 +15,10 @@ terraform {
       source  = "hashicorp/helm"
       version = "~> 2.11"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.6"
+    }
   }
 
   # Uncomment for remote state
@@ -106,6 +110,8 @@ module "codebuild_project" {
   
   ecr_repository_url = module.ecr_repo.repository_url
   s3_bucket_name     = module.s3.bucket_name
+  source_location    = "https://github.com/${var.github_repository}"
+  aws_region         = var.aws_region
 }
 
 # CodePipeline for automated deployments

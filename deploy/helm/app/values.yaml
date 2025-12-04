@@ -12,6 +12,7 @@ image:
 imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
+commonLabels: {}
 
 serviceAccount:
   create: true
@@ -73,6 +74,10 @@ autoscaling:
   maxReplicas: 10
   targetCPUUtilizationPercentage: 70
   targetMemoryUtilizationPercentage: 80
+  behavior:
+    scaleDownStabilizationSeconds: 300
+    scaleUpStabilizationSeconds: 0
+topologySpreadConstraints: []
 
 nodeSelector: {}
 
@@ -123,17 +128,14 @@ env:
     value: "info"
 
 # Environment variables from ConfigMap
-envFrom:
-  - configMapRef:
-      name: app-config
+envFrom: []
 
 # Environment variables from Secret
-envFromSecret:
-  - secretRef:
-      name: app-secret
+envFromSecret: []
 
 # ConfigMap data
 configMap:
+  name: ""
   data:
     APP_NAME: "go-api"
     MAX_CONNECTIONS: "100"
@@ -142,6 +144,7 @@ configMap:
 
 # Secret data (base64 encoded values)
 secret:
+  name: ""
   data:
     # Example: echo -n 'your-secret' | base64
     API_KEY: ""

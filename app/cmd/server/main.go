@@ -3,10 +3,13 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
+	"math/rand"
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -15,10 +18,17 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+)
+
+type ctxKey string
+
+const (
+	ctxKeyResponseWriter ctxKey = "responseWriter"
+	ctxKeyRequestID      ctxKey = "requestID"
 )
 
 var (
-	// Prometheus metrics
 	httpRequestsTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "http_requests_total",
@@ -43,12 +53,15 @@ var (
 		},
 	)
 
-	logger *zap.Logger
+	logger    *zap.Logger = zap.NewNop()
+	startTime             = time.Now()
+	once      sync.Once
 )
 
 type Server struct {
 	router *mux.Router
 	server *http.Server
+	cfg    config
 }
 
 type HealthResponse struct {
@@ -64,36 +77,37 @@ type APIResponse struct {
 	Timestamp time.Time   `json:"timestamp"`
 }
 
-var startTime = time.Now()
-
-func init() {
-	var err error
-	logger, err = zap.NewProduction()
-	if err != nil {
-		panic(fmt.Sprintf("Failed to initialize logger: %v", err))
-	}
+type config struct {
+	Port        string
+	Environment string
+	Version     string
+	LogLevel    string
 }
 
-func NewServer() *Server {
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
+
+func NewServer(cfg config) *Server {
 	s := &Server{
 		router: mux.NewRouter(),
+		cfg:    cfg,
 	}
 
-	// Middleware
-	s.router.Use(loggingMiddleware)
+	s.router.Use(recoverMiddleware)
+	s.router.Use(requestContextMiddleware)
 	s.router.Use(metricsMiddleware)
+	s.router.Use(loggingMiddleware)
 
-	// Routes
-	s.router.HandleFunc("/", homeHandler).Methods("GET")
-	s.router.HandleFunc("/health", healthHandler).Methods("GET")
-	s.router.HandleFunc("/ready", readinessHandler).Methods("GET")
-	s.router.HandleFunc("/api/v1/data", dataHandler).Methods("GET")
-	s.router.HandleFunc("/api/v1/echo", echoHandler).Methods("POST")
-	s.router.Handle("/metrics", promhttp.Handler()).Methods("GET")
+	s.router.HandleFunc("/", homeHandler(cfg)).Methods(http.MethodGet)
+	s.router.HandleFunc("/health", healthHandler(cfg)).Methods(http.MethodGet)
+	s.router.HandleFunc("/ready", readinessHandler).Methods(http.MethodGet)
+	s.router.HandleFunc("/api/v1/data", dataHandler).Methods(http.MethodGet)
+	s.router.HandleFunc("/api/v1/echo", echoHandler).Methods(http.MethodPost)
+	s.router.Handle("/metrics", promhttp.Handler()).Methods(http.MethodGet)
 
-	port := getEnv("PORT", "8080")
 	s.server = &http.Server{
-		Addr:         ":" + port,
+		Addr:         ":" + cfg.Port,
 		Handler:      s.router,
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
@@ -104,8 +118,8 @@ func NewServer() *Server {
 }
 
 func (s *Server) Start() error {
-	logger.Info("Starting server",
-		zap.String("port", s.server.Addr),
+	logger.Info("starting server",
+		zap.String("addr", s.server.Addr),
 		zap.Time("start_time", startTime),
 	)
 
@@ -113,28 +127,58 @@ func (s *Server) Start() error {
 }
 
 func (s *Server) Shutdown(ctx context.Context) error {
-	logger.Info("Shutting down server gracefully...")
+	logger.Info("shutting down server gracefully...")
 	return s.server.Shutdown(ctx)
 }
 
-// Middleware
+func recoverMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if rec := recover(); rec != nil {
+				logger.Error("panic recovered", zap.Any("error", rec))
+				respondError(w, http.StatusInternalServerError, "internal server error")
+			}
+		}()
+		next.ServeHTTP(w, r)
+	})
+}
+
+func requestContextMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reqID := r.Header.Get("X-Request-ID")
+		if reqID == "" {
+			reqID = requestID()
+		}
+
+		rw := newStatusWriter(w)
+		rw.Header().Set("X-Request-ID", reqID)
+
+		ctx := context.WithValue(r.Context(), ctxKeyRequestID, reqID)
+		ctx = context.WithValue(ctx, ctxKeyResponseWriter, rw)
+
+		next.ServeHTTP(rw, r.WithContext(ctx))
+	})
+}
+
 func loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		activeConnections.Inc()
 		defer activeConnections.Dec()
 
-		logger.Info("Request received",
-			zap.String("method", r.Method),
-			zap.String("path", r.URL.Path),
-			zap.String("remote_addr", r.RemoteAddr),
-		)
-
 		next.ServeHTTP(w, r)
 
-		logger.Info("Request completed",
+		rw := responseWriterFromCtx(r.Context())
+		status := http.StatusOK
+		if rw != nil {
+			status = rw.statusCode
+		}
+
+		logger.Info("http_request",
 			zap.String("method", r.Method),
 			zap.String("path", r.URL.Path),
+			zap.Int("status", status),
+			zap.String("request_id", requestIDFromCtx(r.Context())),
 			zap.Duration("duration", time.Since(start)),
 		)
 	})
@@ -146,53 +190,77 @@ func metricsMiddleware(next http.Handler) http.Handler {
 		route := mux.CurrentRoute(r)
 		path, _ := route.GetPathTemplate()
 
-		// Wrap response writer to capture status code
-		wrapped := &responseWriter{ResponseWriter: w, statusCode: http.StatusOK}
+		next.ServeHTTP(w, r)
 
-		next.ServeHTTP(wrapped, r)
+		rw := responseWriterFromCtx(r.Context())
+		status := http.StatusOK
+		if rw != nil {
+			status = rw.statusCode
+		}
 
 		duration := time.Since(start).Seconds()
 		httpRequestDuration.WithLabelValues(r.Method, path).Observe(duration)
-		httpRequestsTotal.WithLabelValues(r.Method, path, fmt.Sprintf("%d", wrapped.statusCode)).Inc()
+		httpRequestsTotal.WithLabelValues(r.Method, path, fmt.Sprintf("%d", status)).Inc()
 	})
 }
 
-type responseWriter struct {
+type statusWriter struct {
 	http.ResponseWriter
 	statusCode int
 }
 
-func (rw *responseWriter) WriteHeader(code int) {
+func newStatusWriter(w http.ResponseWriter) *statusWriter {
+	return &statusWriter{ResponseWriter: w, statusCode: http.StatusOK}
+}
+
+func (rw *statusWriter) WriteHeader(code int) {
 	rw.statusCode = code
 	rw.ResponseWriter.WriteHeader(code)
 }
 
-// Handlers
-func homeHandler(w http.ResponseWriter, r *http.Request) {
-	response := APIResponse{
-		Message:   "Welcome to the Production-Ready Go API",
-		Timestamp: time.Now(),
-		Data: map[string]string{
-			"version":     getEnv("APP_VERSION", "1.0.0"),
-			"environment": getEnv("ENVIRONMENT", "production"),
-		},
+func responseWriterFromCtx(ctx context.Context) *statusWriter {
+	rw, ok := ctx.Value(ctxKeyResponseWriter).(*statusWriter)
+	if !ok {
+		return nil
 	}
-	respondJSON(w, http.StatusOK, response)
+	return rw
 }
 
-func healthHandler(w http.ResponseWriter, r *http.Request) {
-	response := HealthResponse{
-		Status:    "healthy",
-		Timestamp: time.Now(),
-		Version:   getEnv("APP_VERSION", "1.0.0"),
-		Uptime:    time.Since(startTime).String(),
+func requestIDFromCtx(ctx context.Context) string {
+	reqID, ok := ctx.Value(ctxKeyRequestID).(string)
+	if !ok {
+		return ""
 	}
-	respondJSON(w, http.StatusOK, response)
+	return reqID
+}
+
+func homeHandler(cfg config) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		response := APIResponse{
+			Message:   "Welcome to the Production-Ready Go API",
+			Timestamp: time.Now(),
+			Data: map[string]string{
+				"version":     cfg.Version,
+				"environment": cfg.Environment,
+			},
+		}
+		respondJSON(w, http.StatusOK, response)
+	}
+}
+
+func healthHandler(cfg config) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		response := HealthResponse{
+			Status:    "healthy",
+			Timestamp: time.Now(),
+			Version:   cfg.Version,
+			Uptime:    time.Since(startTime).String(),
+		}
+		respondJSON(w, http.StatusOK, response)
+	}
 }
 
 func readinessHandler(w http.ResponseWriter, r *http.Request) {
-	// Add your readiness checks here (database, cache, etc.)
-	// For now, we'll just return ready
 	response := map[string]interface{}{
 		"ready":     true,
 		"timestamp": time.Now(),
@@ -205,7 +273,6 @@ func readinessHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func dataHandler(w http.ResponseWriter, r *http.Request) {
-	// Simulate data retrieval
 	data := map[string]interface{}{
 		"items": []map[string]interface{}{
 			{"id": 1, "name": "Item 1", "price": 99.99},
@@ -226,7 +293,7 @@ func dataHandler(w http.ResponseWriter, r *http.Request) {
 func echoHandler(w http.ResponseWriter, r *http.Request) {
 	var payload map[string]interface{}
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-		respondError(w, http.StatusBadRequest, "Invalid JSON payload")
+		respondError(w, http.StatusBadRequest, "invalid JSON payload")
 		return
 	}
 
@@ -238,12 +305,11 @@ func echoHandler(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, response)
 }
 
-// Helper functions
 func respondJSON(w http.ResponseWriter, status int, payload interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(payload); err != nil {
-		logger.Error("Failed to encode JSON response", zap.Error(err))
+		logger.Error("failed to encode JSON response", zap.Error(err))
 	}
 }
 
@@ -263,28 +329,97 @@ func getEnv(key, defaultValue string) string {
 }
 
 func main() {
+	cfg := loadConfig()
+
+	var err error
+	logger, err = newLogger(cfg.LogLevel)
+	if err != nil {
+		panic(fmt.Sprintf("failed to initialize logger: %v", err))
+	}
 	defer logger.Sync()
 
-	server := NewServer()
+	healthCheck := flag.Bool("health-check", false, "perform a local health check instead of starting the server")
+	flag.Parse()
 
-	// Graceful shutdown
+	if *healthCheck {
+		if err := runHealthCheck(cfg); err != nil {
+			logger.Fatal("health check failed", zap.Error(err))
+		}
+		logger.Info("health check passed")
+		return
+	}
+
+	server := NewServer(cfg)
+
 	go func() {
 		sigChan := make(chan os.Signal, 1)
-		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 		<-sigChan
 
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
 		if err := server.Shutdown(ctx); err != nil {
-			logger.Fatal("Server shutdown failed", zap.Error(err))
+			logger.Fatal("server shutdown failed", zap.Error(err))
 		}
 	}()
 
-	logger.Info("Server starting...")
+	logger.Info("server starting...")
 	if err := server.Start(); err != nil && err != http.ErrServerClosed {
-		logger.Fatal("Server failed to start", zap.Error(err))
+		logger.Fatal("server failed to start", zap.Error(err))
 	}
 
-	logger.Info("Server stopped")
+	logger.Info("server stopped")
+}
+
+func newLogger(level string) (*zap.Logger, error) {
+	cfg := zap.NewProductionConfig()
+	cfg.Level = zap.NewAtomicLevelAt(parseLevel(level))
+	cfg.Encoding = "json"
+	cfg.EncoderConfig.TimeKey = "ts"
+	cfg.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+	return cfg.Build()
+}
+
+func parseLevel(level string) zapcore.Level {
+	switch level {
+	case "debug":
+		return zapcore.DebugLevel
+	case "warn":
+		return zapcore.WarnLevel
+	case "error":
+		return zapcore.ErrorLevel
+	default:
+		return zapcore.InfoLevel
+	}
+}
+
+func loadConfig() config {
+	return config{
+		Port:        getEnv("PORT", "8080"),
+		Environment: getEnv("ENVIRONMENT", "production"),
+		Version:     getEnv("APP_VERSION", "1.0.0"),
+		LogLevel:    getEnv("LOG_LEVEL", "info"),
+	}
+}
+
+func requestID() string {
+	return fmt.Sprintf("%d", rand.Int63())
+}
+
+func runHealthCheck(cfg config) error {
+	client := &http.Client{
+		Timeout: 3 * time.Second,
+	}
+	resp, err := client.Get("http://127.0.0.1:" + cfg.Port + "/health")
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("unhealthy status code: %d", resp.StatusCode)
+	}
+
+	return nil
 }

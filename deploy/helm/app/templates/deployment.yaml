@@ -4,6 +4,9 @@ metadata:
   name: {{ include "app.fullname" . }}
   labels:
     {{- include "app.labels" . | nindent 4 }}
+    {{- with .Values.commonLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
 spec:
   {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
@@ -21,6 +24,9 @@ spec:
         {{- end }}
       labels:
         {{- include "app.selectorLabels" . | nindent 8 }}
+        {{- with .Values.commonLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
@@ -48,12 +54,20 @@ spec:
         - name: {{ .name }}
           value: {{ .value | quote }}
         {{- end }}
-        {{- if .Values.envFrom }}
+        {{- if or .Values.envFrom .Values.envFromSecret .Values.configMap.data .Values.secret.data }}
         envFrom:
+        {{- if .Values.envFrom }}
         {{- toYaml .Values.envFrom | nindent 10 }}
+        {{- else if .Values.configMap.data }}
+          - configMapRef:
+              name: {{ include "app.configMapName" . }}
         {{- end }}
         {{- if .Values.envFromSecret }}
         {{- toYaml .Values.envFromSecret | nindent 10 }}
+        {{- else if .Values.secret.data }}
+          - secretRef:
+              name: {{ include "app.secretName" . }}
+        {{- end }}
         {{- end }}
         resources:
           {{- toYaml .Values.resources | nindent 12 }}
@@ -69,6 +83,10 @@ spec:
         emptyDir: {}
       {{- with .Values.nodeSelector }}
       nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       {{- with .Values.affinity }}

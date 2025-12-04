@@ -5,13 +5,17 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"go.uber.org/zap"
 )
 
 func TestHealthHandler(t *testing.T) {
 	req := httptest.NewRequest("GET", "/health", nil)
 	w := httptest.NewRecorder()
 
-	healthHandler(w, req)
+	logger = zap.NewNop()
+
+	healthHandler(testConfig())(w, req)
 
 	if w.Code != http.StatusOK {
 		t.Errorf("Expected status 200, got %d", w.Code)
@@ -42,7 +46,9 @@ func TestHomeHandler(t *testing.T) {
 	req := httptest.NewRequest("GET", "/", nil)
 	w := httptest.NewRecorder()
 
-	homeHandler(w, req)
+	logger = zap.NewNop()
+
+	homeHandler(testConfig())(w, req)
 
 	if w.Code != http.StatusOK {
 		t.Errorf("Expected status 200, got %d", w.Code)
@@ -55,5 +61,14 @@ func TestHomeHandler(t *testing.T) {
 
 	if response.Message == "" {
 		t.Error("Expected non-empty message")
+	}
+}
+
+func testConfig() config {
+	return config{
+		Port:        "8080",
+		Environment: "test",
+		Version:     "1.0.0-test",
+		LogLevel:    "info",
 	}
 }

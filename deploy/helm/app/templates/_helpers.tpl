@@ -58,3 +58,22 @@ Create the name of the service account to use
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+{{/*
+ConfigMap and Secret names (stable across releases)
+*/}}
+{{- define "app.configMapName" -}}
+{{- if .Values.configMap.name -}}
+{{ .Values.configMap.name }}
+{{- else -}}
+{{ printf "%s-config" (include "app.fullname" .) }}
+{{- end -}}
+{{- end }}
+
+{{- define "app.secretName" -}}
+{{- if .Values.secret.name -}}
+{{ .Values.secret.name }}
+{{- else -}}
+{{ printf "%s-secret" (include "app.fullname" .) }}
+{{- end -}}
+{{- end }}
