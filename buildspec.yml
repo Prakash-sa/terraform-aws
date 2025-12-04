@@ -1,0 +1,57 @@
+version: 0.2
+
+env:
+  variables:
+    AWS_DEFAULT_REGION: "us-east-1"
+    AWS_ACCOUNT_ID: "REPLACE_WITH_YOUR_ACCOUNT_ID"
+    IMAGE_REPO_NAME: "go-api-app"
+    IMAGE_TAG: "latest"
+  parameter-store:
+    # Store sensitive values in AWS Systems Manager Parameter Store
+    # DOCKER_USERNAME: /codebuild/docker/username
+    # DOCKER_PASSWORD: /codebuild/docker/password
+
+phases:
+  pre_build:
+    commands:
+      - echo "Pre-build phase started on `date`"
+      - echo "Logging in to Amazon ECR..."
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+      - REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME
+      - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+      - IMAGE_TAG=${COMMIT_HASH:=latest}
+      - echo "Repository URI = $REPOSITORY_URI"
+      - echo "Image tag = $IMAGE_TAG"
+  
+  build:
+    commands:
+      - echo "Build phase started on `date`"
+      - echo "Running tests..."
+      - cd app
+      - go mod download
+      - go test -v ./...
+      - cd ..
+      - echo "Building Docker image..."
+      - docker build -f build/Dockerfile -t $REPOSITORY_URI:latest .
+      - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
+  
+  post_build:
+    commands:
+      - echo "Post-build phase started on `date`"
+      - echo "Pushing Docker images..."
+      - docker push $REPOSITORY_URI:latest
+      - docker push $REPOSITORY_URI:$IMAGE_TAG
+      - echo "Writing image definitions file..."
+      - printf '[{"name":"go-api-app","imageUri":"%s"}]' $REPOSITORY_URI:$IMAGE_TAG > imagedefinitions.json
+      - echo "Build completed on `date`"
+
+artifacts:
+  files:
+    - imagedefinitions.json
+    - deploy/**/*
+  name: BuildArtifact
+
+cache:
+  paths:
+    - '/root/.cache/**/*'
+    - '/root/go/**/*'

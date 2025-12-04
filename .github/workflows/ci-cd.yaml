@@ -1,0 +1,244 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  EKS_CLUSTER_NAME: go-api-eks-cluster
+  ECR_REPOSITORY: go-api-app
+  HELM_CHART_PATH: ./deploy/helm/app
+  DOCKER_BUILDKIT: 1
+
+jobs:
+  # Job 1: Test and Build Go Application
+  test-and-build:
+    name: Test & Build Go App
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+          cache-dependency-path: app/go.sum
+
+      - name: Run tests
+        working-directory: ./app
+        run: |
+          go test -v -race -coverprofile=coverage.out ./...
+          go tool cover -func=coverage.out
+
+      - name: Run linter
+        uses: golangci/golangci-lint-action@v4
+        with:
+          version: latest
+          working-directory: app
+          args: --timeout=5m
+
+      - name: Build binary
+        working-directory: ./app
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+            -ldflags='-w -s' \
+            -o ../bin/server \
+            ./cmd/server/main.go
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: go-binary
+          path: bin/server
+          retention-days: 1
+
+  # Job 2: Security Scanning
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: test-and-build
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner (Filesystem)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  # Job 3: Build and Push Docker Image
+  build-and-push:
+    name: Build & Push Docker Image
+    runs-on: ubuntu-latest
+    needs: [test-and-build, security-scan]
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tags }}
+      image_digest: ${{ steps.build.outputs.digest }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./build/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+          provenance: false
+
+      - name: Run Trivy vulnerability scanner (Image)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+          format: 'sarif'
+          output: 'trivy-image-results.sarif'
+
+      - name: Upload Trivy image results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-image-results.sarif'
+
+  # Job 4: Deploy to EKS
+  deploy-to-eks:
+    name: Deploy to EKS
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig \
+            --region ${{ env.AWS_REGION }} \
+            --name ${{ env.EKS_CLUSTER_NAME }}
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: 'v3.13.0'
+
+      - name: Deploy with Helm
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          helm upgrade --install go-api-app ${{ env.HELM_CHART_PATH }} \
+            --namespace production \
+            --create-namespace \
+            --set image.repository=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }} \
+            --set image.tag=${{ env.IMAGE_TAG }} \
+            --set environment=production \
+            --timeout 10m \
+            --wait \
+            --atomic
+
+      - name: Verify deployment
+        run: |
+          kubectl rollout status deployment/go-api-app -n production --timeout=5m
+          kubectl get pods -n production -l app.kubernetes.io/name=app
+
+      - name: Run smoke tests
+        run: |
+          # Get service endpoint
+          ENDPOINT=$(kubectl get svc go-api-app -n production -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+          echo "Testing endpoint: http://$ENDPOINT/health"
+          
+          # Wait for service to be ready
+          timeout 300 bash -c 'until curl -sf http://$ENDPOINT/health; do sleep 5; done'
+          
+          # Run health check
+          curl -f http://$ENDPOINT/health || exit 1
+          
+          # Run readiness check
+          curl -f http://$ENDPOINT/ready || exit 1
+          
+          echo "✅ Smoke tests passed!"
+
+  # Job 5: Notify on Success/Failure
+  notify:
+    name: Notify Deployment Status
+    runs-on: ubuntu-latest
+    needs: [deploy-to-eks]
+    if: always()
+    
+    steps:
+      - name: Deployment Success
+        if: needs.deploy-to-eks.result == 'success'
+        run: |
+          echo "🎉 Deployment successful!"
+          echo "Image: ${{ needs.build-and-push.outputs.image_tag }}"
+          echo "Digest: ${{ needs.build-and-push.outputs.image_digest }}"
+
+      - name: Deployment Failure
+        if: needs.deploy-to-eks.result == 'failure'
+        run: |
+          echo "❌ Deployment failed!"
+          exit 1
