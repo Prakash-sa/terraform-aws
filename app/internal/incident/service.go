@@ -12,6 +12,9 @@ import (
 )
 
 // Service manages incidents and AI-powered analysis
+// NOTE: This implementation uses in-memory storage for simplicity.
+// For production use, implement persistent storage (e.g., PostgreSQL, MongoDB)
+// to prevent data loss on service restart.
 type Service struct {
 	incidents map[string]*models.Incident
 	analyses  map[string]*models.AIAnalysis

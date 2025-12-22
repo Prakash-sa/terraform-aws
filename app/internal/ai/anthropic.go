@@ -164,21 +164,8 @@ Format your response as JSON with the following structure:
 		RecommendedActions []string `json:"recommended_actions"`
 	}
 
-	// Try to extract JSON from the response
-	jsonStr := response
-	if strings.Contains(response, "```json") {
-		start := strings.Index(response, "```json") + 7
-		end := strings.LastIndex(response, "```")
-		if start > 7 && end > start {
-			jsonStr = strings.TrimSpace(response[start:end])
-		}
-	} else if strings.Contains(response, "```") {
-		start := strings.Index(response, "```") + 3
-		end := strings.LastIndex(response, "```")
-		if start > 3 && end > start {
-			jsonStr = strings.TrimSpace(response[start:end])
-		}
-	}
+	// Extract JSON from the response
+	jsonStr := extractJSON(response)
 
 	if err := json.Unmarshal([]byte(jsonStr), &analysisData); err != nil {
 		return nil, fmt.Errorf("failed to parse AI response: %w", err)
@@ -255,21 +242,8 @@ Format your response as JSON with the following structure:
 		LessonsLearned     []string `json:"lessons_learned"`
 	}
 
-	// Try to extract JSON from the response
-	jsonStr := response
-	if strings.Contains(response, "```json") {
-		start := strings.Index(response, "```json") + 7
-		end := strings.LastIndex(response, "```")
-		if start > 7 && end > start {
-			jsonStr = strings.TrimSpace(response[start:end])
-		}
-	} else if strings.Contains(response, "```") {
-		start := strings.Index(response, "```") + 3
-		end := strings.LastIndex(response, "```")
-		if start > 3 && end > start {
-			jsonStr = strings.TrimSpace(response[start:end])
-		}
-	}
+	// Extract JSON from the response
+	jsonStr := extractJSON(response)
 
 	if err := json.Unmarshal([]byte(jsonStr), &rcaData); err != nil {
 		return nil, fmt.Errorf("failed to parse RCA response: %w", err)

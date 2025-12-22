@@ -214,7 +214,7 @@ func (rw *responseWriter) WriteHeader(code int) {
 // Handlers
 func homeHandler(w http.ResponseWriter, r *http.Request) {
 	response := APIResponse{
-		Message:   "Welcome to the Production-Ready Go API with AI-Powered Incident Automation",
+		Message:   "Go API with AI-Powered Incident Automation",
 		Timestamp: time.Now(),
 		Data: map[string]string{
 			"version":     getEnv("APP_VERSION", "1.0.0"),
