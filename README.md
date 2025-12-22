@@ -14,6 +14,15 @@ Full-stack production-ready DevOps project with Go API, Kubernetes deployment on
 - ✅ Request/response middleware
 - ✅ Sample API endpoints
 
+### AI-Powered Incident Automation 🤖
+- ✅ Automated incident creation and tracking
+- ✅ AI-powered incident analysis using OpenAI/Claude
+- ✅ Automated severity classification and triage
+- ✅ Log summarization and pattern detection
+- ✅ Root Cause Analysis (RCA) document generation
+- ✅ Recommended actions and preventive measures
+- ✅ REST API for incident management
+
 ### Docker
 - ✅ Multi-stage build for minimal image size
 - ✅ Scratch-based final image
@@ -133,6 +142,7 @@ Push to `main` branch to trigger the CI/CD pipeline.
 
 ## 🔍 API Endpoints
 
+### Core Endpoints
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/` | GET | Home endpoint |
@@ -141,6 +151,64 @@ Push to `main` branch to trigger the CI/CD pipeline.
 | `/metrics` | GET | Prometheus metrics |
 | `/api/v1/data` | GET | Sample data endpoint |
 | `/api/v1/echo` | POST | Echo endpoint |
+
+### AI-Powered Incident Management Endpoints 🤖
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v1/incidents` | POST | Create a new incident |
+| `/api/v1/incidents` | GET | List all incidents |
+| `/api/v1/incidents/{id}` | GET | Get incident details |
+| `/api/v1/incidents/{id}/analyze` | POST | Analyze incident with AI |
+| `/api/v1/incidents/{id}/analysis` | GET | Get AI analysis results |
+| `/api/v1/incidents/{id}/rca/generate` | POST | Generate RCA document |
+| `/api/v1/incidents/{id}/rca` | GET | Get RCA document |
+| `/api/v1/logs/summarize` | POST | Summarize logs with AI |
+
+### Using the Incident Automation API 🤖
+
+**1. Create an Incident:**
+```bash
+curl -X POST http://localhost:8080/api/v1/incidents \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "High CPU Usage Alert",
+    "description": "CPU usage exceeded 90% on production servers",
+    "source": "prometheus",
+    "alert_data": "cpu_usage{instance=\"prod-1\"} > 90",
+    "logs": [
+      "2024-12-22 10:15:23 ERROR: CPU at 92%",
+      "2024-12-22 10:15:45 WARNING: Memory pressure detected"
+    ]
+  }'
+```
+
+**2. Analyze Incident with AI:**
+```bash
+curl -X POST http://localhost:8080/api/v1/incidents/{incident-id}/analyze
+```
+
+**3. Get AI Analysis:**
+```bash
+curl http://localhost:8080/api/v1/incidents/{incident-id}/analysis
+```
+
+**4. Generate RCA Document:**
+```bash
+curl -X POST http://localhost:8080/api/v1/incidents/{incident-id}/rca/generate
+```
+
+**5. Summarize Logs:**
+```bash
+curl -X POST http://localhost:8080/api/v1/logs/summarize \
+  -H "Content-Type: application/json" \
+  -d '{
+    "logs": [
+      "Error: Connection timeout",
+      "Warning: Retry attempt 1",
+      "Error: Max retries exceeded"
+    ]
+  }'
+```
 
 ## 📊 Monitoring
 
@@ -188,6 +256,27 @@ golangci-lint run
 - `ENVIRONMENT` - Environment name (dev/staging/production)
 - `APP_VERSION` - Application version
 - `LOG_LEVEL` - Logging level
+
+### AI Service Configuration 🤖
+- `AI_PROVIDER` - AI service provider: `openai` or `anthropic` (default: openai)
+- `OPENAI_API_KEY` - OpenAI API key (required for OpenAI)
+- `OPENAI_MODEL` - OpenAI model to use (default: gpt-4)
+- `ANTHROPIC_API_KEY` - Anthropic API key (required for Claude)
+- `ANTHROPIC_MODEL` - Anthropic model to use (default: claude-3-5-sonnet-20241022)
+
+#### Setting up AI API Keys
+
+**For OpenAI:**
+1. Get your API key from https://platform.openai.com/api-keys
+2. Base64 encode it: `echo -n 'sk-your-key' | base64`
+3. Add to `deploy/helm/app/values.yaml` under `secret.data.OPENAI_API_KEY`
+
+**For Anthropic (Claude):**
+1. Get your API key from https://console.anthropic.com/
+2. Base64 encode it: `echo -n 'sk-ant-your-key' | base64`
+3. Add to `deploy/helm/app/values.yaml` under `secret.data.ANTHROPIC_API_KEY`
+
+**Note:** API keys are optional. The service will work without them but AI-powered features will be disabled.
 
 ### Terraform Variables
 See `infra/terraform/variables.tf` for all configurable options.
