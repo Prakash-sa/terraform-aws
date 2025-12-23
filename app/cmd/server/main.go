@@ -20,6 +20,7 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
+	"github.com/Prakash-sa/terraform-aws/app/pkg/config"
 	"github.com/Prakash-sa/terraform-aws/app/pkg/handlers"
 	"github.com/Prakash-sa/terraform-aws/app/pkg/service"
 )
@@ -64,7 +65,7 @@ var (
 type Server struct {
 	router          *mux.Router
 	server          *http.Server
-	cfg             config
+	cfg             AppConfig
 	incidentService *service.IncidentService
 	incidentHandler *handlers.IncidentHandler
 }
@@ -82,7 +83,7 @@ type APIResponse struct {
 	Timestamp time.Time   `json:"timestamp"`
 }
 
-type config struct {
+type AppConfig struct {
 	Port        string
 	Environment string
 	Version     string
@@ -93,7 +94,7 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
-func NewServer(cfg config) *Server {
+func NewServer(cfg AppConfig) *Server {
 	s := &Server{
 		router: mux.NewRouter(),
 		cfg:    cfg,
@@ -113,7 +114,7 @@ func NewServer(cfg config) *Server {
 
 	// Initialize incident management system
 	aiCfg := config.LoadConfig()
-	aiClient, err := aiCfg.AI.CreateAIClient()
+	aiClient, err := config.CreateAIClient(aiCfg, logger)
 	if err != nil {
 		logger.Warn("failed to create AI client", zap.Error(err))
 	}
@@ -134,7 +135,7 @@ func NewServer(cfg config) *Server {
 		IdleTimeout:  60 * time.Second,
 	}
 
-	logger.Info("AI configuration loaded", zap.Any("ai_config", aiCfg.AI.Summary()))
+	logger.Info("AI configuration loaded", zap.String("provider", string(aiCfg.AI.Provider)), zap.String("model", aiCfg.AI.Model))
 
 	return s
 }
@@ -256,7 +257,7 @@ func requestIDFromCtx(ctx context.Context) string {
 	return reqID
 }
 
-func homeHandler(cfg config) http.HandlerFunc {
+func homeHandler(cfg AppConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		response := APIResponse{
 			Message:   "Welcome to the Production-Ready Go API",
@@ -270,7 +271,7 @@ func homeHandler(cfg config) http.HandlerFunc {
 	}
 }
 
-func healthHandler(cfg config) http.HandlerFunc {
+func healthHandler(cfg AppConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		response := HealthResponse{
 			Status:    "healthy",
@@ -416,8 +417,8 @@ func parseLevel(level string) zapcore.Level {
 	}
 }
 
-func loadConfig() config {
-	return config{
+func loadConfig() AppConfig {
+	return AppConfig{
 		Port:        getEnv("PORT", "8080"),
 		Environment: getEnv("ENVIRONMENT", "production"),
 		Version:     getEnv("APP_VERSION", "1.0.0"),
@@ -429,7 +430,7 @@ func requestID() string {
 	return fmt.Sprintf("%d", rand.Int63())
 }
 
-func runHealthCheck(cfg config) error {
+func runHealthCheck(cfg AppConfig) error {
 	client := &http.Client{
 		Timeout: 3 * time.Second,
 	}

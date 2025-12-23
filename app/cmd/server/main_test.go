@@ -64,8 +64,8 @@ func TestHomeHandler(t *testing.T) {
 	}
 }
 
-func testConfig() config {
-	return config{
+func testConfig() AppConfig {
+	return AppConfig{
 		Port:        "8080",
 		Environment: "test",
 		Version:     "1.0.0-test",

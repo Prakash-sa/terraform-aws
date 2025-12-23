@@ -1,434 +1,255 @@
 package service
-package service
 
 import (
+	"context"
 	"testing"
-	"time"
 
 	"github.com/Prakash-sa/terraform-aws/app/pkg/ai"
 	"github.com/Prakash-sa/terraform-aws/app/pkg/models"
 	"go.uber.org/zap"
 )
 
-// MockAIClient is a mock implementation of the AI client for testing
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-}	}		t.Error("ResolvedAt should be nil for open incidents")	if incident.ResolvedAt != nil {	}		t.Error("UpdatedAt timestamp is not correct")	if incident.UpdatedAt.Before(beforeCreate) || incident.UpdatedAt.After(afterCreate) {	}		t.Error("CreatedAt timestamp is not correct")	if incident.CreatedAt.Before(beforeCreate) || incident.CreatedAt.After(afterCreate) {	afterCreate := time.Now()	incident, _ := service.CreateIncident(req)	}		Description: "Test Description",		Title:       "Test Incident",	req := &models.CreateIncidentRequest{		beforeCreate := time.Now()	service := NewIncidentService(store, mockAI, logger)	mockAI := &MockAIClient{}	store := NewIncidentStore()	logger, _ := zap.NewDevelopment()func TestIncidentTimestamps(t *testing.T) {}	}		t.Errorf("Expected 10 incidents, got %d", len(incidents))	if len(incidents) != 10 {	incidents, _ := service.ListIncidents(nil, nil)	// Verify all were created	}		<-done	for i := 0; i < 10; i++ {	// Wait for all goroutines	}		}(i)			done <- true			service.CreateIncident(req)			}				Description: "Test Description",				Title:       "Concurrent Incident " + string(rune(index)),			req := &models.CreateIncidentRequest{		go func(index int) {	for i := 0; i < 10; i++ {	done := make(chan bool, 10)	// Test concurrent creates	service := NewIncidentService(store, mockAI, logger)	mockAI := &MockAIClient{}	store := NewIncidentStore()	logger, _ := zap.NewDevelopment()func TestConcurrentOperations(t *testing.T) {}	}		t.Error("Summary should not be empty")	if summary.Summary == "" {	}		t.Error("AI client SummarizeLogs method should be called")	if !mockAI.summarizeLogsCalled {	}		t.Fatalf("SummarizeLogs failed: %v", err)	if err != nil {	summary, err := service.SummarizeLogs(logs)	logs := []string{"Log 1", "Log 2", "Log 3"}	service := NewIncidentService(store, mockAI, logger)	mockAI := &MockAIClient{}	store := NewIncidentStore()	logger, _ := zap.NewDevelopment()func TestSummarizeLogs(t *testing.T) {}	}		t.Error("RCA root cause should not be empty")	if rca.RCADocument.RootCause == "" {	}		t.Error("AI client GenerateRCA method should be called")	if !mockAI.generateRCACalled {	}		t.Error("RCADocument should not be nil")	if rca.RCADocument == nil {	}		t.Fatalf("GenerateRCA failed: %v", err)	if err != nil {	rca, err := service.GenerateRCA(created.ID)	// Generate RCA	created, _ := service.CreateIncident(req)	}		Description: "Test Description",		Title:       "Test Incident",	req := &models.CreateIncidentRequest{	// Create an incident	service := NewIncidentService(store, mockAI, logger)	mockAI := &MockAIClient{}	store := NewIncidentStore()	logger, _ := zap.NewDevelopment()func TestGenerateRCA(t *testing.T) {}	}		t.Error("Analysis summary should not be empty")	if analyzed.AIAnalysis.Summary == "" {	}		t.Error("AI client analyze method should be called")	if !mockAI.analyzeCalled {	}		t.Error("AIAnalysis should not be nil")	if analyzed.AIAnalysis == nil {	}		t.Fatalf("AnalyzeIncident failed: %v", err)	if err != nil {	analyzed, err := service.AnalyzeIncident(created.ID)	// Analyze it	created, _ := service.CreateIncident(req)	}		Logs:        []string{"Log 1", "Log 2"},		Description: "Test Description",		Title:       "Test Incident",	req := &models.CreateIncidentRequest{	// Create an incident	service := NewIncidentService(store, mockAI, logger)	mockAI := &MockAIClient{}	store := NewIncidentStore()	logger, _ := zap.NewDevelopment()func TestAnalyzeIncident(t *testing.T) {}	}		t.Error("Expected error when retrieving deleted incident")	if err == nil {	_, err = service.GetIncident(created.ID)	// Verify it's gone	}		t.Fatalf("DeleteIncident failed: %v", err)	if err != nil {	err := service.DeleteIncident(created.ID)	// Delete it	created, _ := service.CreateIncident(req)	}		Description: "Test Description",		Title:       "Test Incident",	req := &models.CreateIncidentRequest{	// Create an incident	service := NewIncidentService(store, mockAI, logger)	mockAI := &MockAIClient{}	store := NewIncidentStore()	logger, _ := zap.NewDevelopment()func TestDeleteIncident(t *testing.T) {}	}		t.Error("ResolvedAt should be after UpdatedAt")	if updated.ResolvedAt.Before(created.UpdatedAt) {	}		t.Error("ResolvedAt should be set when status changes to resolved")	if updated.ResolvedAt == nil {	updated, _ := service.UpdateIncident(created.ID, updateReq)	}		Status: &status,	updateReq := &models.UpdateIncidentRequest{	status := models.StatusResolved	created, _ := service.CreateIncident(req)	}		Description: "Test Description",		Title:       "Test Incident",	req := &models.CreateIncidentRequest{	// Create and resolve an incident	service := NewIncidentService(store, mockAI, logger)	mockAI := &MockAIClient{}	store := NewIncidentStore()	logger, _ := zap.NewDevelopment()func TestUpdateIncidentResolved(t *testing.T) {}	}		t.Errorf("Expected status %s, got %s", newStatus, updated.Status)	if updated.Status != newStatus {	}		t.Errorf("Expected title %s, got %s", newTitle, updated.Title)	if updated.Title != newTitle {	}		t.Fatalf("UpdateIncident failed: %v", err)	if err != nil {	updated, err := service.UpdateIncident(created.ID, updateReq)	}		Status: &newStatus,		Title:  &newTitle,	updateReq := &models.UpdateIncidentRequest{	newStatus := models.StatusInProgress	newTitle := "Updated Title"	// Update it	created, _ := service.CreateIncident(req)	}		Description: "Original Description",		Title:       "Original Title",	req := &models.CreateIncidentRequest{	// Create an incident	service := NewIncidentService(store, mockAI, logger)	mockAI := &MockAIClient{}	store := NewIncidentStore()	logger, _ := zap.NewDevelopment()func TestUpdateIncident(t *testing.T) {}	}		t.Error("Expected to find at least 1 high severity incident")	if len(incidents) < 1 {	}		t.Fatalf("ListIncidents failed: %v", err)	if err != nil {	incidents, err := service.ListIncidents(nil, &severity)	// Filter by severity	service.CreateIncident(req)	}		Severity:    &severity,		Description: "Critical error in production",		Title:       "High Severity Incident",	req := &models.CreateIncidentRequest{	severity := models.SeverityHigh	service := NewIncidentService(store, mockAI, logger)	mockAI := &MockAIClient{}	store := NewIncidentStore()	logger, _ := zap.NewDevelopment()func TestListIncidentsWithFilter(t *testing.T) {}	}		t.Errorf("Expected 3 incidents, got %d", len(incidents))	if len(incidents) != 3 {	}		t.Fatalf("ListIncidents failed: %v", err)	if err != nil {	incidents, err := service.ListIncidents(nil, nil)	}		service.CreateIncident(req)		}			Description: "Test Description",			Title:       "Test Incident " + string(rune(i)),		req := &models.CreateIncidentRequest{	for i := 0; i < 3; i++ {	// Create multiple incidents	service := NewIncidentService(store, mockAI, logger)	mockAI := &MockAIClient{}	store := NewIncidentStore()	logger, _ := zap.NewDevelopment()func TestListIncidents(t *testing.T) {}	}		t.Error("Expected error for nonexistent incident")	if err == nil {	_, err := service.GetIncident("nonexistent")	service := NewIncidentService(store, mockAI, logger)	mockAI := &MockAIClient{}	store := NewIncidentStore()	logger, _ := zap.NewDevelopment()func TestGetIncidentNotFound(t *testing.T) {}	}		t.Errorf("Expected ID %s, got %s", created.ID, retrieved.ID)	if retrieved.ID != created.ID {	}		t.Fatalf("GetIncident failed: %v", err)	if err != nil {	retrieved, err := service.GetIncident(created.ID)	// Retrieve it	created, _ := service.CreateIncident(req)	}		Description: "Test Description",		Title:       "Test Incident",	req := &models.CreateIncidentRequest{	// Create an incident	service := NewIncidentService(store, mockAI, logger)	mockAI := &MockAIClient{}	store := NewIncidentStore()	logger, _ := zap.NewDevelopment()func TestGetIncident(t *testing.T) {}	}		t.Error("Severity should be classified")	if incident.Severity == "" {	}		t.Errorf("Expected status %s, got %s", models.StatusOpen, incident.Status)	if incident.Status != models.StatusOpen {	}		t.Errorf("Expected title %s, got %s", req.Title, incident.Title)	if incident.Title != req.Title {	}		t.Error("Incident ID should not be empty")	if incident.ID == "" {	}		t.Fatalf("CreateIncident failed: %v", err)	if err != nil {	incident, err := service.CreateIncident(req)	}		Tags:        []string{"test"},		Logs:        []string{"Log 1", "Log 2"},		Source:      "test",		Description: "Test Description",		Title:       "Test Incident",	req := &models.CreateIncidentRequest{	service := NewIncidentService(store, mockAI, logger)	mockAI := &MockAIClient{}	store := NewIncidentStore()	logger, _ := zap.NewDevelopment()func TestCreateIncident(t *testing.T) {// Tests}	return "gpt-4"func (m *MockAIClient) Model() string {}	return ai.ProviderOpenAIfunc (m *MockAIClient) Provider() ai.Provider {}	return nilfunc (m *MockAIClient) Health(ctx interface{}) error {}	}, nil		Alerts:      []string{"Alert 1"},		KeyInsights: []string{"Insight 1", "Insight 2"},		Summary:     "Log analysis summary",	return &ai.SummarizeResponse{	}		return nil, ai.ErrInvalidResponse	if m.shouldError {	m.summarizeLogsCalled = truefunc (m *MockAIClient) SummarizeLogs(ctx interface{}, req ai.SummarizeRequest) (*ai.SummarizeResponse, error) {}	}, nil		LessonsLearned:     []string{"Lesson 1", "Lesson 2"},		PreventiveMeasures: []string{"Increase pool size", "Add monitoring"},		ImmediateResolution: "Restarted database service",		Impact:             "Service unavailable for 15 minutes",		RootCause:          "Database connection pool exhaustion",		Timeline:           "Timeline: incident started at T0",	return &ai.RCAResponse{	}		return nil, ai.ErrInvalidResponse	if m.shouldError {	m.generateRCACalled = truefunc (m *MockAIClient) GenerateRCA(ctx interface{}, req ai.RCARequest) (*ai.RCAResponse, error) {}	}, nil		SuggestedSeverity:  "high",		RecommendedActions: []string{"Action 1", "Action 2"},		RootCauses:         []string{"Root cause 1"},		Findings:           []string{"Finding 1", "Finding 2"},		Summary:            "Test incident analysis",	return &ai.AnalysisResponse{	}		return nil, ai.ErrInvalidResponse	if m.shouldError {	m.analyzeCalled = truefunc (m *MockAIClient) AnalyzeIncident(ctx interface{}, req ai.AnalysisRequest) (*ai.AnalysisResponse, error) {}	shouldError        bool	summarizeLogsCalled bool	generateRCACalled  bool	analyzeCalled      booltype MockAIClient struct {
+// MockAIClient is a mock implementation of ai.Client for testing
+type MockAIClient struct {
+	analyzeErr    error
+	rcaErr        error
+	summarizeErr  error
+	lastAnalysis  ai.AnalysisRequest
+	lastRCA       ai.RCARequest
+	lastSummarize ai.SummarizeRequest
+}
+
+func (m *MockAIClient) AnalyzeIncident(ctx context.Context, req ai.AnalysisRequest) (*ai.AnalysisResponse, error) {
+	m.lastAnalysis = req
+	if m.analyzeErr != nil {
+		return nil, m.analyzeErr
+	}
+	return &ai.AnalysisResponse{
+		Summary:            "Test analysis summary",
+		Findings:           []string{"Finding 1", "Finding 2"},
+		RootCauses:         []string{"Root cause 1"},
+		RecommendedActions: []string{"Action 1"},
+		SuggestedSeverity:  "high",
+	}, nil
+}
+
+func (m *MockAIClient) GenerateRCA(ctx context.Context, req ai.RCARequest) (*ai.RCAResponse, error) {
+	m.lastRCA = req
+	if m.rcaErr != nil {
+		return nil, m.rcaErr
+	}
+	return &ai.RCAResponse{
+		Timeline:            "Timeline details",
+		RootCause:           "Root cause details",
+		Impact:              "Impact details",
+		ImmediateResolution: "Immediate resolution",
+		PreventiveMeasures:  []string{"Measure 1"},
+		LessonsLearned:      []string{"Lesson 1"},
+	}, nil
+}
+
+func (m *MockAIClient) SummarizeLogs(ctx context.Context, req ai.SummarizeRequest) (*ai.SummarizeResponse, error) {
+	m.lastSummarize = req
+	if m.summarizeErr != nil {
+		return nil, m.summarizeErr
+	}
+	return &ai.SummarizeResponse{
+		Summary:     "Log summary",
+		KeyInsights: []string{"Insight 1"},
+		Alerts:      []string{"Alert 1"},
+	}, nil
+}
+
+func (m *MockAIClient) Health(ctx context.Context) error {
+	return nil
+}
+
+func (m *MockAIClient) Provider() ai.Provider {
+	return ai.ProviderOpenAI
+}
+
+func (m *MockAIClient) Model() string {
+	return "gpt-4"
+}
+
+func TestCreateIncident(t *testing.T) {
+	store := NewIncidentStore()
+	mockAI := &MockAIClient{}
+	logger := zap.NewNop()
+	service := NewIncidentService(store, mockAI, logger)
+
+	req := &models.CreateIncidentRequest{
+		Title:       "Test incident",
+		Description: "Test description",
+		Source:      "test",
+	}
+
+	incident, err := service.CreateIncident(req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if incident.ID == "" {
+		t.Error("incident ID should not be empty")
+	}
+	if incident.Title != "Test incident" {
+		t.Errorf("expected title 'Test incident', got %q", incident.Title)
+	}
+	if incident.Status != models.StatusOpen {
+		t.Errorf("expected status 'open', got %q", incident.Status)
+	}
+}
+
+func TestGetIncident(t *testing.T) {
+	store := NewIncidentStore()
+	mockAI := &MockAIClient{}
+	logger := zap.NewNop()
+	service := NewIncidentService(store, mockAI, logger)
+
+	// Create incident first
+	req := &models.CreateIncidentRequest{
+		Title:       "Test",
+		Description: "Test",
+	}
+	created, _ := service.CreateIncident(req)
+
+	// Get incident
+	retrieved, err := service.GetIncident(created.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if retrieved.ID != created.ID {
+		t.Errorf("expected ID %q, got %q", created.ID, retrieved.ID)
+	}
+}
+
+func TestGetIncidentNotFound(t *testing.T) {
+	store := NewIncidentStore()
+	mockAI := &MockAIClient{}
+	logger := zap.NewNop()
+	service := NewIncidentService(store, mockAI, logger)
+
+	_, err := service.GetIncident("nonexistent")
+	if err == nil {
+		t.Error("expected error for nonexistent incident")
+	}
+}
+
+func TestListIncidents(t *testing.T) {
+	store := NewIncidentStore()
+	mockAI := &MockAIClient{}
+	logger := zap.NewNop()
+	service := NewIncidentService(store, mockAI, logger)
+
+	// Create a few incidents
+	for i := 0; i < 3; i++ {
+		service.CreateIncident(&models.CreateIncidentRequest{
+			Title:       "Test",
+			Description: "Test",
+		})
+	}
+
+	incidents, err := service.ListIncidents(nil, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(incidents) != 3 {
+		t.Errorf("expected 3 incidents, got %d", len(incidents))
+	}
+}
+
+func TestUpdateIncident(t *testing.T) {
+	store := NewIncidentStore()
+	mockAI := &MockAIClient{}
+	logger := zap.NewNop()
+	service := NewIncidentService(store, mockAI, logger)
+
+	// Create incident first
+	created, _ := service.CreateIncident(&models.CreateIncidentRequest{
+		Title:       "Test",
+		Description: "Test",
+	})
+
+	// Update incident
+	newTitle := "Updated title"
+	updated, err := service.UpdateIncident(created.ID, &models.UpdateIncidentRequest{
+		Title: &newTitle,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if updated.Title != "Updated title" {
+		t.Errorf("expected title 'Updated title', got %q", updated.Title)
+	}
+}
+
+func TestDeleteIncident(t *testing.T) {
+	store := NewIncidentStore()
+	mockAI := &MockAIClient{}
+	logger := zap.NewNop()
+	service := NewIncidentService(store, mockAI, logger)
+
+	// Create incident first
+	created, _ := service.CreateIncident(&models.CreateIncidentRequest{
+		Title:       "Test",
+		Description: "Test",
+	})
+
+	// Delete incident
+	err := service.DeleteIncident(created.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify it's deleted
+	_, err = service.GetIncident(created.ID)
+	if err == nil {
+		t.Error("expected error after deletion")
+	}
+}
+
+func TestAnalyzeIncident(t *testing.T) {
+	store := NewIncidentStore()
+	mockAI := &MockAIClient{}
+	logger := zap.NewNop()
+	service := NewIncidentService(store, mockAI, logger)
+
+	// Create incident first
+	created, _ := service.CreateIncident(&models.CreateIncidentRequest{
+		Title:       "Test",
+		Description: "Test",
+	})
+
+	// Analyze incident
+	analyzed, err := service.AnalyzeIncident(created.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if analyzed.AIAnalysis == nil {
+		t.Error("expected AI analysis to be present")
+	}
+	if analyzed.AIAnalysis.Summary != "Test analysis summary" {
+		t.Errorf("expected summary 'Test analysis summary', got %q", analyzed.AIAnalysis.Summary)
+	}
+}
+
+func TestSummarizeLogs(t *testing.T) {
+	store := NewIncidentStore()
+	mockAI := &MockAIClient{}
+	logger := zap.NewNop()
+	service := NewIncidentService(store, mockAI, logger)
+
+	logs := []string{"log 1", "log 2", "log 3"}
+	summary, err := service.SummarizeLogs(logs)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if summary.Summary != "Log summary" {
+		t.Errorf("expected summary 'Log summary', got %q", summary.Summary)
+	}
+}
