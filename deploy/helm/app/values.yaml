@@ -126,12 +126,26 @@ env:
     value: "1.0.0"
   - name: LOG_LEVEL
     value: "info"
+  # AI Provider Configuration
+  - name: AI_PROVIDER
+    value: "openai"  # or "anthropic"
+  - name: OPENAI_MODEL
+    value: "gpt-4"
+  - name: ANTHROPIC_MODEL
+    value: "claude-3-5-sonnet-20241022"
+  - name: AI_TIMEOUT
+    value: "60"
+  - name: AI_TEMPERATURE
+    value: "0.7"
+  - name: AI_MAX_TOKENS
+    value: "2000"
 
 # Environment variables from ConfigMap
 envFrom: []
 
-# Environment variables from Secret
-envFromSecret: []
+# Environment variables from Secret - for API keys
+envFromSecret:
+  - name: ai-secrets
 
 # ConfigMap data
 configMap:
@@ -150,6 +164,18 @@ secret:
     API_KEY: ""
     DATABASE_URL: ""
     JWT_SECRET: ""
+
+# AI API Keys Secret - stored separately for better security
+aiSecret:
+  name: "ai-secrets"
+  create: true
+  data:
+    # OpenAI API Key (base64 encoded)
+    # Generate with: echo -n 'sk-xxx' | base64
+    OPENAI_API_KEY: ""
+    # Anthropic API Key (base64 encoded)
+    # Generate with: echo -n 'sk-ant-xxx' | base64
+    ANTHROPIC_API_KEY: ""
 
 # PodDisruptionBudget
 podDisruptionBudget:

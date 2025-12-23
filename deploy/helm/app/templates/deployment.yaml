@@ -68,6 +68,10 @@ spec:
           - secretRef:
               name: {{ include "app.secretName" . }}
         {{- end }}
+        {{- else }}
+        envFrom:
+          - secretRef:
+              name: {{ .Values.aiSecret.name }}
         {{- end }}
         resources:
           {{- toYaml .Values.resources | nindent 12 }}

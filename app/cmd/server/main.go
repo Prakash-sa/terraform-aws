@@ -19,6 +19,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+
+	"github.com/Prakash-sa/terraform-aws/app/pkg/handlers"
+	"github.com/Prakash-sa/terraform-aws/app/pkg/service"
 )
 
 type ctxKey string
@@ -59,9 +62,11 @@ var (
 )
 
 type Server struct {
-	router *mux.Router
-	server *http.Server
-	cfg    config
+	router          *mux.Router
+	server          *http.Server
+	cfg             config
+	incidentService *service.IncidentService
+	incidentHandler *handlers.IncidentHandler
 }
 
 type HealthResponse struct {
@@ -106,6 +111,21 @@ func NewServer(cfg config) *Server {
 	s.router.HandleFunc("/api/v1/echo", echoHandler).Methods(http.MethodPost)
 	s.router.Handle("/metrics", promhttp.Handler()).Methods(http.MethodGet)
 
+	// Initialize incident management system
+	aiCfg := config.LoadConfig()
+	aiClient, err := aiCfg.AI.CreateAIClient()
+	if err != nil {
+		logger.Warn("failed to create AI client", zap.Error(err))
+	}
+
+	incidentStore := service.NewIncidentStore()
+	incidentService := service.NewIncidentService(incidentStore, aiClient, logger)
+	incidentHandler := handlers.NewIncidentHandler(incidentService, logger)
+	incidentHandler.RegisterRoutes(s.router)
+
+	s.incidentService = incidentService
+	s.incidentHandler = incidentHandler
+
 	s.server = &http.Server{
 		Addr:         ":" + cfg.Port,
 		Handler:      s.router,
@@ -113,6 +133,8 @@ func NewServer(cfg config) *Server {
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  60 * time.Second,
 	}
+
+	logger.Info("AI configuration loaded", zap.Any("ai_config", aiCfg.AI.Summary()))
 
 	return s
 }
